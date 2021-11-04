@@ -1,0 +1,359 @@
+#+title: 7062CEM Install Contiki
+#+Author: James Brusey
+#+Email: james.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:800, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 2
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem install contiki">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+* Learning outcomes
+
++ Be able to create a VM instance for Contiki
+
++ Run a basic hello-world program under Contiki
+
+* First steps
+
+- You might need [[https://git-scm.com/downloads][git]] under Windows (~sudo apt-get~ is for Linux)
+
+- You will also need [[https://www.virtualbox.org/wiki/Downloads][VirtualBox]] (including the extension pack) and [[https://www.vagrantup.com/downloads.html][Vagrant]]
+
+- Follow the instructions at https://github.com/contiki-ng/contiki-ng/wiki for Vagrant
+
+* What is VirtualBox?
+
+- VirtualBox allows you to run Virtual Machines (VMs) hosted underneath your current operating system
+
+- The guest operating system (inside the VM) thinks it has full access to a whole computer
+
+- In fact, some parts are substituted
+
+  - e.g., a host file contains the guest's `hard-disk'
+
+- Some parts are provided optionally
+
+  - e.g., access to USB ports
+
+- Often, the VM is run `headless', which means it's not given a display
+
+* What is Vagrant?
+
+- Vagrant is an open-source software configuration management tool written in Ruby
+
+- Vagrant’s configuration for a particular development environment sits in a file called Vagrantfile
+
+- Vagrant is controlled by command line instructions
+
+- =vagrant -h=  - to get a list of commands (such as =vagrant up=)
+
+- =vagrant up -h=  - to get specific help on the up sub-command
+
+* Performing the installation
+
+** The first step is to clone (download) contiki-ng
+
+You may want to disable =autocrlf= for git using:
+#+BEGIN_SRC
+git config --global core.autocrlf false
+#+END_SRC
+
+This creates a copy of the whole contiki repository on your local disk.
+
+#+BEGIN_SRC
+C:\Users\xxx> git clone https://github.com/contiki-ng/contiki-ng.git
+Cloning into 'contiki-ng'...
+remote: Enumerating objects: 29, done.
+remote: Counting objects: 100% (29/29), done.
+remote: Compressing objects: 100% (23/23), done.
+remote: Total 129899 (delta 8), reused 13 (delta 5), pack-reused 129870
+Receiving objects: 100% (129899/129899), 76.77 MiB | 6.65 MiB/s, done.
+Resolving deltas: 100% (95688/95688), done.
+#+END_SRC
+
+Instructions for doing a git clone with no change to line endings.
+
+** Step 2 starting the VM
+
+The next step will download the guest operating system (Ubuntu) and start it inside a VM
+
+Need to change to the correct directory first! (It contains =Vagrantfile=)
+#+BEGIN_SRC
+C:\Users\xxx> vagrant up
+Bringing machine 'default' up with 'virtualbox' provider...
+==> default: Box 'ubuntu/bionic64' could not be found. Attempting to find and install...
+#+END_SRC
+
+- if you are having problem here, it may be due to your BIOS settings not allowing virtualisation
+- see [[https://bce.berkeley.edu/enabling-virtualization-in-your-pc-bios.html]]
+
+- additionally, it is often helpful to install the =vagrant-vbguest= plugin
+#+BEGIN_SRC
+$ vagrant plugin install vagrant-vbguest
+#+END_SRC
+
+** Step 3 login to the VM using SSH
+
+#+BEGIN_SRC
+C:\Users\xxx> vagrant ssh
+...
+vagrant@ubuntu-bionic:~$
+#+END_SRC
+
+- at this point, this is a vanilla Ubuntu image
+
+- vagrant sets up a /share/ between the guest and host
+
+** Step 4 run the bootstrap script
+
+Check for correct line endings by
+
+#+BEGIN_SRC
+$ od -c ./contiki-ng/tools/vagrant/bootstrap.sh | head
+#+END_SRC
+
+and check for the line endings being =\n=
+
+#+BEGIN_SRC
+$ sudo ./contiki-ng/tools/vagrant/bootstrap.sh
+#+END_SRC
+
+- note that you may need to convert the bootstrap line endings first
+
+- =sudo= tells the command to run with root privileges
+
+** Step 5 reboot the VM
+#+BEGIN_SRC
+$ exit
+...
+
+C:\Users\xxx> vagrant reload
+#+END_SRC
+(directory here is probably wrong!)
+
+- Check to see that it comes up ok and in particular watch for this ...
+
+#+BEGIN_SRC
+==> default: Mounting shared folders...
+#+END_SRC
+
+- If shared folders are not mounted then you won't be able to run the next step.
+
+** Step 6 log back in and try it out
+
+[[https://github.com/contiki-ng/contiki-ng/wiki/Tutorial:-Hello,-World!]]
+
+#+BEGIN_SRC
+C:> vagrant ssh
+...
+$ cd contiki-ng/examples/hello-world/
+$ make TARGET=native
+$ ./hello-world.native
+#+END_SRC
+
+You should get the following output:
+
+#+BEGIN_SRC
+[WARN: Tun6      ] Failed to open tun device (you may be lacking permission). Running without network.
+[INFO: Main      ] Starting Contiki-NG-release/v4.6-54-g425587de4
+[INFO: Main      ] - Routing: RPL Lite
+[INFO: Main      ] - Net: tun6
+[INFO: Main      ] - MAC: nullmac
+[INFO: Main      ] - 802.15.4 PANID: 0xabcd
+[INFO: Main      ] - 802.15.4 Default channel: 26
+[INFO: Main      ] Node ID: 1800
+[INFO: Main      ] Link-layer address: 0102.0304.0506.0708
+[INFO: Main      ] Tentative link-local IPv6 address: fe80::302:304:506:708
+[INFO: Native    ] Added global IPv6 address fd00::302:304:506:708
+Hello, world
+#+END_SRC
+
+- The network errors are normal when running natively.
+
+* Accessing our server
+Please note that this section is under revision due to moving the server to a different location and new firewall rules at Coventry University.
+It will be updated as soon as we have a new server available for you.
+
+** Logging into the server
+We are also providing access to a VM with contiki pre-installed
+#+BEGIN_SRC
+ssh -p 2222 xxx@cogentee.hopto.org
+#+END_SRC
+where ~xxx~ is the username that you have been provided with.
+
+- You should also have been given a password.
+
+** What it looks like
+
+#+BEGIN_SRC
+The authenticity of host '[cogentee.hopto.org]:2222 ([213.106.109.33]:2222)' can't be established.
+ECDSA key fingerprint is SHA256:7jVYKsBTdPqZkEReCdRn/Dd/n9BFjNeTWdP2+HpvUKI.
+Are you sure you want to continue connecting (yes/no/[fingerprint])? yes
+
+Warning: Permanently added '[cogentee.hopto.org]:2222,[213.106.109.33]:2222' (ECDSA) to the list of known hosts.
+xxx@cogentee.hopto.org's password:
+xxx@ubuntu-bionic:~$
+#+END_SRC
+
+** Trying it out
+
+First make a copy of the contiki directory (only need to do this once)
+
+#+BEGIN_SRC
+$ git clone https://github.com/contiki-ng/contiki-ng.git
+$ cd contiki-ng
+$ git submodule update --init --recursive
+#+END_SRC
+
+Possibly also do the submodules clone here?
+
+Then you should be able to compile the hello-world example as before
+#+BEGIN_SRC
+$ cd contiki-ng/examples/hello-world/
+$ make TARGET=native
+$ ./hello-world.native
+#+END_SRC
+
+** Editing your files
+
+To edit the file, you need to use a text editor, such as =nano=, =vi=, or =emacs=.
+
+#+BEGIN_SRC
+nano hello-world.c
+#+END_SRC
+
+[[file:figures/nano.png]]
+
+- =nano= is pretty basic though!
+- You can't use the mouse, you have to move around with the arrow keys.
+
+* Transferring files
+
+When you come to hand in your assignment, you'll want to be able to transfer files to or from the remote server
+
+One way to do this is =scp= source target
+
+The following copies =hello-world.c= to our current directory:
+#+BEGIN_SRC
+C:\Users\xxx> scp -P 2222 xxx@cogentee.hopto.org:contiki-ng/examples/hello-world.c .
+#+END_SRC
+
+The following copies =hello-world.c= to the remote:
+#+BEGIN_SRC
+C:\Users\xxx> scp -P 2222 hello-world.c xxx@cogentee.hopto.org:contiki-ng/examples/
+#+END_SRC
+
+
+* Using GNU Emacs and tramp (optional)
+
+- GNU Emacs is a very powerful open source editor
+- Spacemacs or Doom Emacs package up some of the nicer add-ons
+- We are going to show the use of TRAMP
+
+[[file:figures/emacs-spacemacs.png]]
+[[file:figures/doom-emacs.png]]
+
+
+** Installing GNU Emacs on Windows
+
+- There are many guides for this but you might try [[http://mdr78.github.io/2019/07/01/windows-spacemacs-install.html]]
+
+** Using TRAMP
+
+- Use C-x C-f to start opening a file
+- At the prompt, enter
+
+#+BEGIN_SRC
+/ssh:xxx@cogentee.hopto.org#2222:
+#+END_SRC
+
+- =/ssh:= indicates the protocol to use
+
+- =xxx@= is the username followed by `@'
+
+- =cogentee.hopto.org= is the hostname
+
+- =#2222= means port 2222
+
+- Pay attention to the leading =/= and ending =:= to avoid this being misinterpreted as a normal file name
+
+- This should prompt for your password and then show you a directory listing
+
+- At the bottom `mode line' you should see something like:
+
+[[file:figures/tramp-modeline.png]]
+
+- The `@' sign indicates a remote file location
+
+- You can now open a file by moving the cursor to it and pressing enter
+
+- When you save the file =C-x C-s=, the revised contents are sent across the 'net.
+
+- With a remote file open, use =M-x= (alt key plus `x') to enter an emacs command and type
+#+BEGIN_SRC
+shell
+#+END_SRC
+to bring up a shell prompt
+
+- You can swap between files using =C-x b RET=
+
+* Using Virtual Network Computing (VNC)
+
+VNC allows you to access a virtual desktop environment on a remote server.
+
+There are a few steps to getting this working.
+
+[[file:figures/vnc_viewer.png]]
+
+** Identify the port number
+
+We have allocated 1 port number per student with a number between 5902 and 5912 inclusive. For the example below, I've used 5901 but you'll need to change that to your own number.
+
+** SSH Tunneling
+- Most IP ports are hidden by the firewall (including port 5901)
+
+- SSH provides a way to access these ports using an [[https://help.ubuntu.com/community/SSH/OpenSSH/PortForwarding][/ssh tunnel/]].
+#+BEGIN_SRC 
+      --------------------   	       -------------------- 
+     | Local              | 	      |      	   Remote  |	
+     |             SSH----22<=======>22---SSH	           |
+     |  --------    |     |           |    | 	 --------  |
+     | | VNC    |<=>5901  |           |  5901<=>| VNC    | |
+     | | Viewer |         |           |	        | Server | |
+     | |        |         |           |         |        | |
+     |  --------          |           |          --------  |    
+      -------------------- 	       -------------------- 	      
+#+END_SRC
+*** SSH tunneling using command line
+
+- To set up a tunnel, enter the following command from a PowerShell prompt, changing =xxx= for your username:
+
+#+BEGIN_SRC
+ssh -p 2222 -L 5901:localhost:5901 xxx@cogentee.hopto.org
+#+END_SRC
+
+- Note that you need to leave the connection open to keep the tunnel running.
+
+*** SSH tunneling using putty
+
+- If you prefer to use [[https://www.putty.org][putty]] for ssh, you can set a tunnel up using instructions from [[https://blog.devolutions.net/2017/4/how-to-configure-an-ssh-tunnel-on-putty]]
+
+  - An example configuration for port 5901 can be seen below. This needs to be done after the correct session information is set.
+[[file:figures/ssh_putty.png]]
+
+** Running VNC Viewer
+
+- Download VNC Viewer from : [[https://www.realvnc.com/en/connect/download/viewer/]]
+
+- Use the appropriate vnc viewer for your operating system (has support for Windows, Mac, Linux and even ChromeOS)
+
+- Add a 'New Connection' and input =localhost:5901= (change this!), to the VNC Server Field.
+
+[[file:figures/vnc-localhost.png]]
+
+* Summary
+
+- We've covered installing Contiki from scratch and getting a hello world program running
+
+- We've also covered how to use our server with =ssh=, =tramp=, and =vnc=

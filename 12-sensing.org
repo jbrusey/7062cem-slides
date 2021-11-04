@@ -1,0 +1,203 @@
+#+title: 7062CEM Sensors and sensing
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:1200, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 1
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem sensors and sensing">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+* Learning outcomes                                                   
+
+Understand
+- what a sensor is
+
+- what sensor deviation (or error) is
+
+- how to acquire sensor readings using the Telos Mote
+
+* What is a sensor?                                                   
+
+#+begin_quote
+“A *sensor* is a *transducer* whose purpose is to *sense* (that is, to detect) some characteristic of its environs.”
+--- wikipedia
+#+end_quote
+
+A perfect sensor is only sensitive to the measured property and insensitive to other properties while not influencing the environment.
+
+* Sensor deviation                                                    
+
+A sensor measurement may be different from the true value due to systematic errors, e.g.:
+- bias
+- non-linearity
+- drift
+- hysteresis (or memory effects)
+
+or random errors, e.g.:
+- digitization errors
+- noise
+
+* How to reduce sensor deviation?                                     
+
+Bias and non-linearity are generally lessened through *calibration* 
+
+Noise is usually reduced by *filtering*
+- e.g. moving average, Kalman filter, etc
+
+However, do not forget that some noise may be resolved by 
+- better sensor design (improved analogue circuitry)
+- shielding cables from interference
+
+* Sensor types                                                        
+
+| temperature                  |
+| humidity                     |
+| gas concentration (e.g. CO2) |
+| electricity (W or kWh)       |
+| switch or push button        |
+| pressure                     |
+| acceleration                 |
+| acoustic                     |
+| hydrophone                   |
+| fluid or gas flow rates      |
+| radiant heat                 |
+| proximity (infrared)         |
+| magnetic (e.g. compass)      |
+| location (GPS)               |
+| gyroscopic                   |
+
+also see http://en.wikipedia.org/wiki/List_of_sensors 
+
+* Telos Mote Hardware (front)                                         
+[[file:figures/tmote.jpg]]
+
+* Telos expansion connector                                           
+[[file:figures/telos-expansion.png]]
+
+* Obtaining sensor data in Contiki                                    
+
+Driver files for the Telos mote are available under =arch/platform/sky/dev=
+
+To find a file starting with =sht11= use:
+#+BEGIN_SRC sh
+find . -name "sht11*"
+#+END_SRC
+
+Each sensor needs to be declared as:
+#+BEGIN_SRC C
+SENSORS_SENSOR(sensor, NAME, value, configure, status);
+#+END_SRC
+
+For example, the battery sensor for the Telos is in =arch/platform/sky/dev/battery_sensor.c= and in there you will see:
+#+BEGIN_SRC C
+SENSORS_SENSOR(battery_sensor, BATTERY_SENSOR, value, configure, status);
+#+END_SRC
+
+** Things you can do to a sensor                                      
+The following C will activate, deactivate, and obtain the value from a sensor. 
+#+BEGIN_SRC C
+SENSORS_ACTIVATE(sensor)    
+SENSORS_DEACTIVATE(sensor)  
+sensor.value(type); 
+#+END_SRC
+
+The type parameter depends on the sensor and refers to the type of reading you are requesting (e.g., temperature or humidity)
+
+** Battery example                                                    
+#+BEGIN_SRC C
+#include "dev/battery-sensor.h"
+#include "stdio.h"
+/*---------------------------------------------------------------------------*/
+PROCESS(test_battery_process, "Battery Sensor Test");
+AUTOSTART_PROCESSES(&test_battery_process);
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(test_battery_process, ev, data)
+{
+  static uint32_t battery;
+  PROCESS_BEGIN();
+  SENSORS_ACTIVATE(battery_sensor);
+
+  while(1) {
+    battery = battery_sensor.value(0);
+    battery *= 5000;
+    battery /= 4095;
+    printf("Battery: %u.%03uV\n", (uint16_t)battery / 1000, (uint16_t)battery % 1000);
+  }
+  PROCESS_END();
+}
+#+END_SRC
+Excerpt From: Antonio Liñán Colina, Alvaro Vives, Antoine Bagula, Marco Zennaro and Ermanno Pietrosemoli. “Internet of Things (IoT) in 5 days”. (added include for stdio.h)
+
+** Telos sensor example                                               
+
+#+BEGIN_SRC C
+#include "stdio.h"
+#include "contiki.h"
+#include "dev/sensor/sht11/sht11.h"
+#include "dev/sensor/sht11/sht11-sensor.h"
+
+PROCESS(temp, "Temperature");
+AUTOSTART_PROCESSES(&temp);
+PROCESS_THREAD(temp, ev, data)
+{
+  static struct etimer timer;
+  PROCESS_BEGIN();
+
+  /* Setup a periodic timer that expires after 10 seconds. */
+  etimer_set(&timer, CLOCK_SECOND * 10);
+  SENSORS_ACTIVATE(sht11_sensor);
+  while (1) {
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer));
+    int temp = sht11_sensor.value(SHT11_SENSOR_TEMP);
+    printf("temp: %d\n", temp);
+    etimer_reset(&timer);
+  }
+
+  PROCESS_END();
+}
+#+END_SRC
+*** Notes
+1. The above code does not interpret the integer value returned. According to the data sheet, this value must be divided by 100 and 39.6 subtracted
+   \[ x/100-39.6 \]
+   In C, you need something like:
+   #+BEGIN_SRC C
+float s = ((0.01*val) - 39.60);
+int dec = s;
+float frac = s - dec;
+   #+END_SRC   
+2. Other sensors can also be accessed by changing the parameter to =value= to =SHT11_SENSOR_?=. See the header files (in the =arch/dev/sensor/sht11= directory) for a complete list of options.
+
+* Proxy or virtual sensors                                            
+Some sensors can be used to measure something seemingly unrelated - think about what the following might measure
+- light sensor inside cupboard
+- humidity sensor in a bathroom
+- CO2 sensor in bedroom (!)
+- CO2 sensor in a car cabin
+- temperature sensor in a pendant or worn device
+- pressure sensor at the foot of a quay (underwater)
+
+* Key things to remember                                              
+
+- /read/ the data sheet
+- use sample code from Internet (warily!)
+- be aware of conflicting use of pins 
+- check conversion 
+  - what is the true maximum adc value?
+  - max / min voltage?
+- deal with noise in hardware first (but software later)
+  - twist lead wires together
+  - reduce lead wire distance if possible
+  - filtering capacitor needed? placed where?
+
+* What we covered                                                     
+
+- what a sensor is
+- what sort of sensors are on the Telos mote
+- how to interface to them using Contiki code
+- how to obtain detailed interfacing information for specific devices
+
+* Additional reading                                                  
+
+- datasheet for SHT11 (temperature and humidity sensor on Telosb)
+- TelosB datasheet (see Aula)

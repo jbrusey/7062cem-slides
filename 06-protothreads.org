@@ -1,0 +1,155 @@
+#+title: 7062CEM Protothreads
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:1200, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 1
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem install contiki">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+* Learning outcomes
+
+- Understand why we need protothreads
+
+- Understand how they work
+
+- Be able to diagnose basic protothread errors
+
+* Motivation
+
+- Consider any task that involves blocking:
+  - opening a file
+  - reading a file
+  - interacting with the i2c bus
+  - sending a message over the radio
+
+- Without multi-tasking, we need to loop around and wait for completion
+- Modern operating systems have some form of `wait' instruction that `blocks' this task until a certain thing has happened.
+- In the meantime, other tasks can be run by `context switching'
+
+* Wait, what?
+
+- To multitask, we need to be able to do several things:
+
+  1. save the context (program counter, registers)
+  2. load a different context (same but for a different process)
+  3. restart executing
+
+- To do it really well, we also want to protect process A from process B
+  - we need memory protection / virtual memory addressing
+  - we need supervisor mode to do special things like switch context
+  - not all CPUs have support for all this!
+
+* State machines
+
+- Consider a simple control problem: toggling a light
+- When we press the button and the light is *on*, we turn it *off*
+- When we press the button and the light is *off*, we turn it *on*
+
+* How do we /express/ this
+
+ - First we enumerate all possible states as $q_1, q_2, \ldots$
+ - In this case, we have 2 states (light on or off)
+ - Then we define the conditions for transitions between states
+ - The result can be drawn as a graph
+
+#+ATTR_LATEX: :width 0.3\textwidth
+[[file:figures/fsm.png]]
+
+
+
+* Converting to code 
+#+BEGIN_SRC C
+void toggle() {
+  while (1) {
+    while (! get_button()) {}
+    turn_on_light();
+    while (! get_button()) {}
+    turn_off_light();
+  }
+}
+#+END_SRC
+- but this means we can't do anything else while waiting for the button press
+
+* Just one state transition
+
+- *Key idea*: perform one state transition per function call 
+
+#+BEGIN_SRC C
+int fsm(int state) {
+  button = get_button();
+  if (state == 1 && button) {
+    turn_on_light();
+    state = 2;
+  }
+  else if (state == 2 && button) {
+    turn_off_light();
+    state = 1;
+  }
+  return state;
+}
+#+END_SRC
+
+* So what do protothreads do?
+
+[[http://dunkels.com/adam/pt/expansion.html]]
+
+Note: in Contiki, the macros start =PROCESS=, not =PT=
+
+* Exercise - Check out the macro expansion
+
+#+BEGIN_SRC sh
+$ cd contiki/examples/hello-world
+$ make -n TARGET=native hello-world
+#+END_SRC
+- extract from this the CC command to compile hello-world.c and change “-c” to “-E” (stop after running pre-processor)
+#+BEGIN_SRC sh
+cc ... -c hello-world.c -o hello-world.o
+#+END_SRC
+to
+#+BEGIN_SRC sh
+cc ... -E hello-world.c -o hello-world.i
+#+END_SRC
+* Examine the result
+- can you see what each macro got substituted for?
+#+BEGIN_SRC C
+static char process_thread_hello_world_process(struct pt *process_pt, process_event_t ev, process_data_t data)
+{
+  static struct etimer timer;
+  { char PT_YIELD_FLAG = 1; if (PT_YIELD_FLAG) {;} switch((process_pt)->lc) { case 0:;
+  etimer_set(&timer, 1000 * 3);
+  while(1) {
+    printf("Hello, James\n");
+    do { PT_YIELD_FLAG = 0; (process_pt)->lc = 60; case 60:; if((PT_YIELD_FLAG == 0) || !(etimer_expired(&timer))) { return 1; } } while(0);
+    etimer_reset(&timer);
+  }
+  }; PT_YIELD_FLAG = 0; (process_pt)->lc = 0;; return 3; };
+}
+#+END_SRC
+* Communicating between two processes
+- It seems like we can call one process from another
+- However, you should never do this!
+  - Think about what =process_pt= struct you are passing in
+- Instead use =PROCESS_POST= to queue an event that is then received by the other process
+
+* Things to watch for
+- =process_pt= is a structure with =lc= being the line counter
+
+- rather than loop and wait, set =lc= to the current line and return immediately
+
+- the =switch= and =case= causes a jump into the inside of the loop when =lc= is 60!
+
+* Key ideas
+
+- Protothreads are a super-lightweight way to get multiple processes to run concurrently.
+ 
+- PT use (tricky) macros to turn ordinary looking code into a state machine
+ 
+- Understanding how they work helps when diagnosing compilation problems
+
+* Summary 
+
+- We've uncovered the heart of Contiki, which is concurrency through protothreads
+
+- Understanding PTs will help when trying to understand compiler errors

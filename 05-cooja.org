@@ -1,0 +1,73 @@
+#+title: 7062CEM Cooja
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:1200, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 1
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem install contiki">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+
+* Learning outcomes
+- Familiarity with Cooja basics
+- Know how to run and save a simple simulation
+* What is Cooja? 
+- Java-based Contiki network simulation
+- Allows simulation of small and large networks
+- Two types of motes can be simulated:
+  - =cooja= motes run native code
+  - =sky= motes emulate the hardware but simulation may be slower as a result
+- You shouldn't need to adjust your code to run in simulation
+
+* Getting started with Cooja
+** Prerequisites
+- While compiling Contiki doesn't require a windowing display, Cooja /does/
+- Two options for this:
+  - use VNC
+  - install a desktop environment
+- Try the instructions at https://github.com/contiki-ng/contiki-ng/wiki/Vagrant#provision-a-vm-with-a-desktop-environment
+
+- Adjust the Vagrantfile to uncomment =vb.gui = true=
+  #+BEGIN_SRC ruby
+  config.vm.provider "virtualbox" do |vb|
+    # Display the VirtualBox GUI when booting the machine
+    vb.gui = true
+  end
+  #+END_SRC
+
+- Run the bootstrap script for setting up X packages
+#+BEGIN_SRC sh
+$ ./contiki-ng/tools/vagrant/bootstrap-vbox-with-x.sh
+#+END_SRC
+- Reboot after the install
+- I found that this added some virtualbox-guest packages which were then removed by vagrant's vbguest plugin
+- If you don't end up with a graphical login prompt, don't worry---you can just run =startx= on the command line after logging in on the gui window.
+- You may need to download the cooja submodules if you haven't already
+  #+BEGIN_SRC sh
+  $ cd ~/contiki-ng
+  $ git submodule update --init --recursive
+  #+END_SRC
+
+** Create a new simulation
+Follow the tutorial listed here: https://github.com/contiki-ng/contiki-ng/wiki/Tutorial:-Running-Contiki%E2%80%90NG-in-Cooja
+
+If you encounter errors, try the fix suggested here: https://github.com/contiki-os/contiki/issues/2324
+
+[[file:figures/cooja-new-sim.png]]
+
+** Simple UDP RPL simulation
+[[https://tools.ietf.org/html/rfc6550][RPL]] is the Routing Protocol for Low power and Lossy Networks
+
+https://github.com/contiki-ng/contiki-ng/wiki/Tutorial:-running-a-RPL-network-in-Cooja
+
+[[file:figures/cooja-rpl-udp.png]]
+
+** Next steps
+
+- Try the other simulation tutorials out until you feel you have a good understanding about what's going on.
+- Review the code for the client and server and identify where messages are being sent and received.
+
+* Summary
+- We've covered getting the simulation gui up and running and running a basic simulation
+- This tool should come in handy when you write your own code

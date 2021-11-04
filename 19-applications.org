@@ -1,0 +1,160 @@
+#+title: 7062CEM Applications
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:1200, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 1
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem sensors and sensing">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+* Learning outcomes                                                   
+
+  Understand
+  - the different parts that make up a typical IoT application
+  - ethical issues that may arise
+  - key constraints on what IoT can do
+
+* Parts of an IoT Application
+
+** The mote or node 
+
+[[file:figures/tmote.jpg]]
+
+  - Generally, all motes receive the same software 
+
+** The border router
+
+  - Also known as sink, gateway, or root node
+  - Generally consists of a mote connected to the USB port of a PC
+  - Can also be a Raspberry PI and mote
+  - Converts protocols between mote network (e.g., RPL or 6LowPAN) and ordinary IP network
+  - May require special software that is different from all other motes
+
+** Message Queue
+
+  - The Message Queue (e.g., MQTT) provides a connector between the source (motes) and sink (back-end database)
+  - Publish / subscribe architecture is used
+  - Security may be an issue and consider configuring passwords early in the design
+
+** Web-server (CoAP)
+
+  - CoAP is the Constrained Application Protocol (RFC7252)
+  - It can be thought of as a REST web server approach
+  - The CoAP server provides a HTTP style service and sits on a PC
+  - Motes make CoAP /requests/ using GET, PUT, POST, DELETE verbs
+  - The server responds with /responses/
+  - See IoT in 5 days for more info.
+
+** Rule-based systems (Node-RED, IFTTT)
+
+  - Systems like Node-RED can subscribe to messages from MQTT
+  - They can then transform and act on those messages
+  - Node-RED is good for wiring systems together
+
+* Ethical issues
+
+** Considering privacy
+
+  - If you are performing an `experiment', then standard ethical tests apply
+    - participants must have informed consent
+    - they must be able to opt out at any time
+  - Information can often be derived indirectly:
+    - Bathroom humidity might indicate when shower is in use
+    - Bedroom CO2 sensors might identify sleep patterns or sexual activity
+  - Participants should be anonymised
+
+** Consider GDPR issues
+
+  - Data protection provides guidance about what data should be stored and processed
+  - Reprocessing data for a different purpose than the originally stated purpose is not allowed
+  - Further reading is [[https://ico.org.uk/for-organisations/guide-to-data-protection/guide-to-the-general-data-protection-regulation-gdpr/][available]]
+
+** Who owns the data?
+
+  - Data ownership is often overlooked
+  - Your contract may state that the data is owned by the company who employed you
+  - When considering ownership, keep in mind GDPR reprocessing issues
+
+** It shouldn't be up to the individual to decide
+
+  - As a researcher or an employee, neither you nor your superior should decide what is ethical
+  - There must always be a higher, independent authority
+  - This might be a professional association, such as the IEEE, or a university ethics board
+
+* Constraints
+
+** Radio limitations
+
+- Maximal transmission / reception distances are a factor of:
+  - transmitter power
+  - receiver power / sensitivity
+  - radio frequency
+  - building materials for any structures
+  - interference
+
+- Overall, expect typical IoT devices to have a range of around 20m indoors and about 100m outdoors
+
+*** Transmission power
+- IoT devices tend to operate with much less power than laptop WiFi and thus will have a smaller range
+- Transmission power can be adjusted to help reduce power consumption
+
+*** Radio frequency
+
+- As with all electromagnetic waves, higher frequencies are blocked by solid objects whereas lower frequencies tend to pass through
+- WiFi, BlueTooth, ZigBee and other IEEE 802.15.4 use the 2.4GHz ISM band
+
+*** Building materials and shape
+
+- Electrically conductive materials (water or metal) tend to absorb RF better than non-conductive materials (wood or air)
+- In some cases, structures may help to extend the range slightly (e.g., in a long corridor)
+
+*** Interference
+
+- Many systems use the same ISM bands and interference is common
+- Channel hopping approaches may help to bypass interference - particularly when operating near heavy machinery
+
+** Network lifetime
+
+  - How long a network lasts for without changing the batteries is an important factor for many applications
+ 
+  - Power consumption is an important consideration and has been discussed in another lecture.
+
+  - Energy harvesting may allow indefinite extension of the network life
+
+  - Specialist batteries can improve lifetime also
+
+  - Software approaches are another avenue for improving lifetime
+
+*** Battery technology
+
+  - Specialist batteries may help extend the life of a system
+
+  - Main consideration for the battery is volume / weight and mAh rating
+
+  - For energy harvesting consider lead-acid batteries (although these can be dangerous in some situations)
+
+  - Rechargeable batteries will tend to have shorter lifetimes per charge cycle but last longer overall
+
+*** Energy harvesting
+
+  - Solar panels are inexpensive and reliable but you must also have a battery that you can charge to continue to operate overnight
+
+  - Wind is less reliable
+
+  - Supercapacitors can be used to smooth out small fluctuations
+
+** Memory
+
+  - Most motes have very limited memory and thus will restrict
+    - code size
+    - stored data
+  - It may be possible to store more data in non-volatile flash memory
+    - e.g., Telos mote has 1Mb flash
+
+** Time accuracy
+
+  - Motes generally have inaccurate clocks
+  - Protocols such as TSCH (Time Synchronized Channel Hopping) may help
+  - Assume that your mote clock is several seconds out
+

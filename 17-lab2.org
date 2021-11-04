@@ -1,0 +1,219 @@
+#+title: 7062CEM Lab Session 2
+#+Author: Nandor Verba
+#+Email: ad2833@coventry.ac.uk
+#+Options: toc:nil
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+
+* Prerequisites
+- You must be able to access the remote server and use an editor to edit files on the remote server
+- You must have access to a mote (you should have been allocated one)
+- You must have Cooja set up in either your local environment or on the VNC server provided
+
+* Learning outcomes                                                   
+- Gain a better understanding of routing protocols in Contiki-NG. 
+- Be able to understand and modify the RPL UDP examples to suit your needs.
+- Be able to set up a new Cooja environment with your newly defined nodes and run a simulation.
+- Be able to compile the code onto physical motes and check that it's working.
+
+* Simple RPL network with 2 nodes
+
+In this exercise you will take two RPL UDP examples and modify them so that they have two distinct and simplified behaviours.
+This will allow you to better understand what each of the =simple_udp= components do and how to edit them to suit your needs.
+
+Start by finding the two rpl-udp examples:
+
+#+BEGIN_SRC sh
+examples/rpl_udp/udp_client.c
+examples/rpl_udp/udp_server.c
+#+END_SRC
+
+Create a copy of the =rpl_udp= folder so you can edit the file freely and still keep the originals.
+Make sure you are in the =contiki-ng/examples= folder when you do this. 
+
+#+BEGIN_SRC sh
+cp -r rpl_udp my_rpl_app
+#+END_SRC
+
+** Step 1 - Simplifying the code
+Edit the newly copied files by removing anything except the raw transmission and reply features. 
+
+You should get the below code for your client:
+
+#+BEGIN_SRC C
+#include "contiki.h"
+#include "net/routing/routing.h"
+#include "random.h"
+#include "net/netstack.h"
+#include "net/ipv6/simple-udp.h"
+
+#include "sys/log.h"
+#define LOG_MODULE "App"
+#define LOG_LEVEL LOG_LEVEL_INFO
+
+#define UDP_CLIENT_PORT 8765
+#define UDP_SERVER_PORT 5678
+
+#define SEND_INTERVAL     (10 * CLOCK_SECOND)
+
+static struct simple_udp_connection udp_conn;
+
+PROCESS(udp_client_process, "UDP client");
+AUTOSTART_PROCESSES(&udp_client_process);
+
+PROCESS_THREAD(udp_client_process, ev, data)
+{
+  static struct etimer periodic_timer;
+  static char str[32];
+  uip_ipaddr_t dest_ipaddr;
+
+  PROCESS_BEGIN();
+
+  /* Initialize UDP connection */
+  simple_udp_register(&udp_conn, UDP_CLIENT_PORT, NULL,
+                      UDP_SERVER_PORT, NULL);
+
+  etimer_set(&periodic_timer, SEND_INTERVAL);
+
+
+  while(1) {
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&periodic_timer));
+
+    if(NETSTACK_ROUTING.node_is_reachable() && NETSTACK_ROUTING.get_root_ipaddr(&dest_ipaddr)) {
+      /* Send to DAG root */
+      LOG_INFO("Sending request to ");
+      LOG_INFO_6ADDR(&dest_ipaddr);
+      LOG_INFO_("\n");
+      snprintf(str, sizeof(str), "hello from client");
+      simple_udp_sendto(&udp_conn, str, strlen(str), &dest_ipaddr);
+    } else {
+      LOG_INFO("Not reachable yet\n");
+    }
+
+    /* Send Event Timer */
+    etimer_set(&periodic_timer, SEND_INTERVAL);
+  }
+
+  PROCESS_END();
+}
+#+END_SRC
+
+Use the following code for the server:
+
+#+BEGIN_SRC C
+#include "contiki.h"
+#include "net/routing/routing.h"
+#include "net/netstack.h"
+#include "net/ipv6/simple-udp.h"
+
+#include "sys/log.h"
+#define LOG_MODULE "App"
+#define LOG_LEVEL LOG_LEVEL_INFO
+
+#define UDP_CLIENT_PORT 8765
+#define UDP_SERVER_PORT 5678
+
+static struct simple_udp_connection udp_conn;
+
+PROCESS(udp_server_process, "UDP server");
+AUTOSTART_PROCESSES(&udp_server_process);
+
+static void
+udp_rx_callback(struct simple_udp_connection *c,
+         const uip_ipaddr_t *sender_addr,
+         uint16_t sender_port,
+         const uip_ipaddr_t *receiver_addr,
+         uint16_t receiver_port,
+         const uint8_t *data,
+         uint16_t datalen)
+{
+  LOG_INFO("Received request '%.*s' from ", datalen, (char *) data);
+  LOG_INFO_6ADDR(sender_addr);
+  LOG_INFO_("\n");
+}
+
+PROCESS_THREAD(udp_server_process, ev, data)
+{
+  PROCESS_BEGIN();
+
+  /* Initialize DAG root */
+  NETSTACK_ROUTING.root_start();
+
+  /* Initialize UDP connection */
+  simple_udp_register(&udp_conn, UDP_SERVER_PORT, NULL,
+                      UDP_CLIENT_PORT, udp_rx_callback);
+
+  PROCESS_END();
+}
+#+END_SRC
+
+** Step 2 - Compiling the code to check for errors
+
+Once your code is edited, try compiling it with the make commands and correct any errors.
+
+#+BEGIN_SRC sh
+make TARGET=sky udp_client
+make TARGET=sky udp_server
+#+END_SRC
+
+** Step 2 - Loading the code onto Cooja and testing it
+
+Once you are happy that your code compiles, create a Cooja simulation with two motes.
+You should initially add one server and one client. 
+
+After running the code you should see the output similar to the following. 
+Note that several "Not reachable yet" messages occur before messages from the client are transmitted to the server. 
+
+[[file:figures/cooja-networking.png]]
+
+
+* Group exercise
+
+  This exercise will have you working in  separate break-out rooms with each room setting up their own RPL network tree. 
+  You each have access to a single mote so you will need to work together to set up the network and be able to send and receive messages. 
+  To ensure that you do not conflict with other rooms, edit your code to use the client and server port numbers assigned to your room.
+
+** Step 1 - Change both port numbers
+
+#+BEGIN_SRC C
+#define UDP_CLIENT_PORT xxxx  # <- change 
+#define UDP_SERVER_PORT yyyy  # <- change 
+#+END_SRC
+
+Assign one person to run the server - the others will run clients.
+
+Optionally, add a LED blink when you send (red) or receive (green).
+
+Hint: This can be done, by turning on a led when the message is sent, waiting a brief period of time and turning it off again. e.g., 
+
+#+BEGIN_SRC C
+leds_on(LEDS_RED);
+etimer_set(&et, CLOCK_SECOND/10);
+PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&et));
+leds_off(LEDS_RED);
+#+END_SRC
+
+
+** Step 2 - Download the code to the mote and run!
+
+To upload your code the your device:
+
+Build the project for the example file 'my_test.c'
+
+#+BEGIN_SRC sh
+make TARGET=sky my_test
+#+END_SRC
+
+Upload the compiled files to the device where x is your usb number.
+
+#+BEGIN_SRC sh
+make my_test.upload PORT=/dev/ttyUSB[x]
+#+END_SRC
+
+Log in to see the outputs. 
+
+#+BEGIN_SRC sh
+make login PORT=/dev/ttyUSB[x]
+#+END_SRC
+
+Hopefully it works! Good luck!

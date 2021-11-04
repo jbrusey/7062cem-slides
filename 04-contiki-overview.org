@@ -1,0 +1,327 @@
+#+title: 7062CEM Contiki-NG Overview
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:1200, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 1
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem contiki overview">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+#+latex_header: \usepackage{array}
+#+latex_header: \newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1\columnwidth}}
+#+latex_header: \newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1\columnwidth}}
+#+latex_header: \newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1\columnwidth}}
+
+* Learning outcomes
+- Familiarity with Contiki-NG basics
+- Be able to list the key features of Contiki-NG
+- Know how to compile a simple application
+
+* What is Contiki?
+- Light-weight, open-source OS for IoT.
+- Connects tiny low-cost, low-power microcontrollers to the Internet.
+- Powerful tool for building complex wireless applications
+  - Remote house monitoring, intrusion detection, industrial monitoring, streetlights, and so on.
+
+* Contiki or Contiki-NG?
+- We are using Contiki-NG throughout
+- Contiki-NG is a fork from Contiki from 2017
+- Focus is on reliability, better documentation, and more regular release cycles
+- However, pretty much everything that we are doing can also be done with vanilla Contiki
+  
+* Key features	
+
+** Rapid development
+- Standard C 
+- Cooja simulator
+- Instant Contiki (we're not using this as it is quite old)
+- Open-source and active community
+
+** Full IP networking
+- Fully standard IPv4 and IPv6
+- Support for standard IP protocols: TCP, UDP, HTTP, MQTT
+- Support for low-power wireless standards: 6lowpan, RPL and CoAP
+
+** Rime stack
+- If bandwidth is limited or full IPv6 stack is an overkill
+- Supports simple operations such as unicast, broadcast, flooding, and address-free multi-hop
+
+** A selection of hardware
+- Range of low-power, wireless devices
+- Zolertia Firefly motes
+  [[file:figures/zolertia-firefly.png]]
+** Zolertia Firefly Mote
+- Zoul module
+  - CC2538 ARM Cortex-M3
+  - 2 on-board IEEE802.15.4-compliant transceivers 
+    - 2.4GHz and 863-950MHz
+  - 512KB programmable flash 
+- Low-power IoT development platform 
+  - Active state: 20mA; Idle state (3 modes) : 0.4uA - 0.6mA
+- On-board pin connectors: SPI and I2C interface support
+
+** Protothreads
+- Low overhead mechanism for concurrent programming
+- Mixture of event-driven and multi-threaded programming mechanisms
+- Each Contiki-NG process is a protothread
+
+** Coffee flash file system
+- Open, read, write, append and close functions on files on the external flash
+
+** Power awareness
+- Mechanisms to estimate and understand the power consumption of the system 
+- Enable motes to run for years on AA batteries
+
+** Dynamic Module Loading
+- Supports dynamic linking and loading of modules at run-time
+- Over-the-air programming
+
+** Build system 
+- Make files
+- Easy to compile on any supported hardware
+
+** Examples 
+- =contiki/examples=
+- iot-workshop/examples/zolertia
+
+* Getting started with Contiki-NG
+
+We are using the vagrant image but there are several other options (including running native on Windows).
+
+
+** Contiki-NG structure: Exploring Contiki
+Directory structure
+#+BEGIN_SRC sh
+contiki-ng/
+  arch         # architecture dependent
+  examples     # generic examples
+  os           # main contiki operating system
+  tests        # test code 
+  tools        # tools for users (including cooja)
+#+END_SRC
+See https://github.com/contiki-ng/contiki-ng/wiki/Repository-structure
+
+** Hello World!
+
+#+BEGIN_SRC c
+#include "contiki.h"
+
+#include <stdio.h> /* For printf() */
+/*---------------------------------------------------------------------------*/
+PROCESS(hello_world_process, "Hello world process");
+AUTOSTART_PROCESSES(&hello_world_process);
+/*---------------------------------------------------------------------------*/
+PROCESS_THREAD(hello_world_process, ev, data)
+{
+  static struct etimer timer;
+
+  PROCESS_BEGIN();
+
+  /* Setup a periodic timer that expires after 10 seconds. */
+  etimer_set(&timer, CLOCK_SECOND * 10);
+
+  while(1) {
+    printf("Hello, world\n");
+
+    /* Wait for the periodic timer to expire and then restart the timer. */
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer));
+    etimer_reset(&timer);
+  }
+
+  PROCESS_END();
+}
+/*---------------------------------------------------------------------------*/
+
+#+END_SRC
+
+** Makefile	
+#+BEGIN_SRC makefile
+CONTIKI_PROJECT = hello-world
+all: $(CONTIKI_PROJECT)
+
+CONTIKI = ../..
+include $(CONTIKI)/Makefile.include
+
+#+END_SRC
+
+* Connect the mote
+1. When physically connecting the mote to your laptop, be careful of the USB connector
+   - e.g. use an extender, hub, or prop the laptop on a book to make sure that the connector doesn't break
+2. Since we are using a VM, we need to give the VM access to the physical device.
+   - it is possible to do this in the gui (but error prone)
+   - to make sure you get the right settings, edit Vagrant file and restart the VM 
+     #+BEGIN_SRC ruby
+  config.vm.provider "virtualbox" do |vb|
+    vb.customize ["modifyvm", :id, "--usb", "on",
+                  "--usbxhci", "on",
+                  "--paravirtprovider", "kvm"]
+    vb.customize ["usbfilter", "add", "0", 
+                  "--target", :id, 
+    	          "--name", "MTM-CM5000MSP",
+	          "--vendorid", "0x0403",
+	          "--productid", "0x6001"]
+  #   # Display the VirtualBox GUI when booting the machine
+  #   vb.gui = true
+  #
+  #   # Customize the amount of memory on the VM:
+  #   vb.memory = "1024"
+  end
+#+END_SRC
+3. Check that the mote has connected ok
+   #+BEGIN_SRC sh
+make TARGET=sky motelist
+   #+END_SRC
+
+* Compile and upload Hello World
+1. To access the device, you'll need to have =dialout= access
+   #+BEGIN_SRC sh
+$ id
+uid=1000(vagrant) gid=1000(vagrant) groups=1000(vagrant),20(dialout),998(docker)
+   #+END_SRC
+2. For each =make= command, you can specify
+   1. =TARGET= (will be either =sky= or =native=)
+   2. =BOARD= (only needed for some boards)
+   3. =PORT= (e.g., =/dev/ttyUSB0=)
+3. Save typing by saving the =TARGET= (gets saved just for that directory)
+   #+BEGIN_SRC sh
+make TARGET=sky savetarget
+   #+END_SRC
+   You can also set the =PORT= (for that login session) using:
+   #+BEGIN_SRC sh
+export PORT=/dev/ttyUSB0
+   #+END_SRC
+
+4. Compile your code
+   #+BEGIN_SRC sh
+$ make hello-world
+   #+END_SRC
+5. Upload your code to the device (you may need to tell it the =PORT=):
+   #+BEGIN_SRC sh
+$ make hello-world.upload
+   #+END_SRC
+6. To see the output from the program, connect to the serial port using:
+   #+BEGIN_SRC sh
+$ make login
+   #+END_SRC
+7. If you get some garbled output, try resetting the mote using the reset button.
+
+* Contiki-NG build system: quick look
+See https://github.com/contiki-ng/contiki-ng/wiki/The-Contiki%E2%80%90NG-build-system
+
+The build system is comprised of multiple =Makefile= files
+   1. =projectdir/Makefile= contains options and instructions for that project and an =include= for the master Contiki makefile. e.g.,
+      #+BEGIN_SRC sh
+CONTIKI_PROJECT = udp-client udp-server
+all: $(CONTIKI_PROJECT)
+
+CONTIKI=../..
+include $(CONTIKI)/Makefile.include
+      #+END_SRC
+   2. =Makefile.include= is in the root of the Contiki-NG source tree. It includes:
+      - C files needed for core system
+      - includes =Makefile.$TARGET= and =app= Makefiles
+   3. =Makefile.$(TARGET)= where =$(TARGET)= is the platform (e.g., =sky=)
+      - located in =arch/platforms/$(TARGET)=
+      - includes C files that are specific to that platform (e.g., =sht11-sensor.c=)
+   4. =Makefile.$(CPU)= where =$(CPU)= is the processor (e.g., =msp430=)
+      - located in =arch/cpu/$(CPU)=
+      - includes code specific to that processor (e.g., =flash.c=)
+   5. =Makefile.$(MODULE)= where =$(MODULE)= is the name of a module in the =os= directory.
+
+	
+* Things to try out
+1. =contiki/examples=
+2. =iot-workshop= branch in  https://github.com/alignan/contiki
+
+* Useful resources
+- Get started with Contiki-NG: https://www.contiki-ng.org/ 
+- IoT in five days: https://github.com/marcozennaro/IPv6-WSN-book/releases/
+- Contiki tutorial: https://www.slideshare.net/salahecom/contiki-seminar-1
+- Contiki tutorials: https://anrg.usc.edu/contiki/index.php/Contiki_tutorials
+
+* Thank you!
+
+* Additional info
+
+** Creating your own Contiki application
+- Go to your home directory and create a subdirectory =my-first-app=
+  #+BEGIN_SRC sh
+$ cd
+$ mkdir my-first-app
+#+END_SRC
+- Inside the folder create a new C file =My-first-app.c=
+- It may help to look at the examples to ensure you include all the right bits.
+- Create a =Makefile= in the same folder. Ensure you specify the right directory 
+  #+BEGIN_SRC makefile
+CONTIKI_PROJECT = my-first-app
+all: $(CONTIKI_PROJECT)
+
+CONTIKI=~/contiki-ng
+include $(CONTIKI)/Makefile.include
+#+END_SRC
+- You should now be able to compile and upload the program
+#+BEGIN_SRC sh
+$ make TARGET=sky savetarget
+$ make my-first-app
+$ make my-first-app.upload
+$ make login
+#+END_SRC
+
+** Generic Structure of a Contiki Program
+#+BEGIN_SRC c
+/* header files */
+#include <...>
+
+/* declare processes */
+PROCESS(name, "description of process");
+/* ... */
+/* autostart processes */
+AUTOSTART_PROCESSES(name);
+/* ... */
+/* define process */
+PROCESS_THREAD(name, ev, data)
+{
+  /* declare and static init vars */
+  PROCESS_BEGIN();
+  /* main code */
+  PROCESS_END();
+}
+#+END_SRC
+
+
+** Contiki APIs: Process
+#+attr_latex: :align L{0.4} L{0.6} 
+| Function                    | Description                                                            |
+|-----------------------------+------------------------------------------------------------------------|
+| =PROCESS_BEGIN()=             | Define the beginning of a process                                      |
+| =PROCESS_END()=               | Define the end of a process                                            |
+| =PROCESS_WAIT_EVENT()=        | Wait for an event to be posted to the process                          |
+|                             | Blocks the currently running process until an event is received        |
+| =PROCESS_WAIT_EVENT_UNTIL(c)= | Wait for an event to be posted to the process, with an extra condition |
+| =PROCESS_YIELD()=             | Yield the currently running process                                    |
+| =PROCESS_YIELD_UNTIL(c)=      | Yield the currently running process until a condition occurs           |
+| =PROCESS_WAIT_UNTIL(c)=       | Wait for a condition to occur                                          |
+| =PROCESS_EXIT()=              | Exit the currently running process                                     |
+| =PROCESS_PAUSE()=             | Yield the process for a short while                                    |
+
+** Contiki APIs: Sensor
+Each sensor has a set of functions for controlling it and query it for its state.
+Some sensors also generate events when sensor values change.
+A sensor must be activated before it generates events or relevant values.
+#+attr_latex: :align L{0.4} L{0.6} 
+| Function                   | Description                                                      |
+|----------------------------+------------------------------------------------------------------|
+| =SENSORS_ACTIVATE(sensor)=   | Activate the sensor                                              |
+| =SENSORS_DEACTIVATE(sensor)= | Deactivate the sensor                                            |
+| =sensor.value(o)=           | Query the sensor for its last value (e.g. button pressed or not)  |
+| =sensor_event=             | Event sent when a sensor has changed                             |
+
+** Contiki APIs: LED
+| Function        | Description    |
+|-----------------+----------------|
+| =leds_on()=     | Turn LEDs on   |
+| =leds_off()=    | Turn LEDs off  |
+| =leds_invert()= | Toggle LEDs    |
+| =leds_blink()=  | Blink all LEDs |
+

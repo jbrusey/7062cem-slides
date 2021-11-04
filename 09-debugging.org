@@ -1,0 +1,263 @@
+#+title: 7062CEM Debugging
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:1200, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 1
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem install contiki">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+* Learning outcomes
+
+- Understand the basic tools for debugging
+
+- Understand the principles of unit testing
+
+- Resolving basic compile time problems
+
+* KISS                                                                 
+
+#+BEGIN_QUOTE
+... there are two ways of constructing a software design: One way is to make it so simple that there are /obviously/ no deficiencies, and the other way is to make it so complicated that there are no /obvious/ deficiencies. The first method is far more difficult. It demands the same skill, devotion, insight, and even inspiration as the discovery of the simple physical laws which underlie the complex phenomena of nature.
+
+--- C.A.R. Hoare, [[https://zoo.cs.yale.edu/classes/cs422/2011/bib/hoare81emperor.pdf][1980]]
+#+END_QUOTE
+
+* Tools for debugging
+
+- LED testing (Toggle between ON and OFF)
+- Using “printf” support
+- Simulation
+- Unit testing
+
+* Using LEDs
+
+- You will probably start to use LEDs for debugging when you transfer your code to the mote, especially if the mote is not tethered to a PC
+
+- Useful for answering questions like:
+  - Does some event or error state occur (ever)?
+  - Is an event occurring regularly (but not too fast)?
+
+- Not so good for:
+  - Is a sensor reading meaningful and changing with the environment?
+  - How many times is an event occurring (exactly)?
+  - Exactly which error state occurred?
+
+* Using printf
+
+- Good  for:
+  - Checking sensor readings (is it reasonable?)
+  - Printing counts or numerical values
+  - Use =make login= to see the output
+
+- Not good for:
+  - Testing complex radio communication
+  - Testing a base station node connected serially
+
+* Simulation (Cooja)
+
+- Simulation is appropriate for
+  - larger scale tests (with more motes than available)
+  - network communication testing
+
+- Simulation might not help with:
+  - identifying simple problems (printf / leds may be quicker)
+  - sensor related issues
+
+* Unit testing
+
+- unit tests provide a way of testing an individual component or function without having to run the full application
+
+[[https://github.com/contiki-os/contiki/blob/master/apps/unit-test/example-test.c]]
+
+* Declarations
+Start by including the =unit-test.h= header
+#+BEGIN_SRC C
+#include "contiki.h"
+#include "unit-test.h"
+#+END_SRC
+
+Each test method needs to be declared along with a descriptive string
+#+BEGIN_SRC C
+UNIT_TEST_REGISTER(arithmetic, "Arith ops");
+#+END_SRC
+
+* Unit test method
+The method then begins like this:
+#+BEGIN_SRC C
+UNIT_TEST(arithmetic)
+{
+  /* declarations go here */
+
+  UNIT_TEST_BEGIN();
+#+END_SRC
+
+You then need to perform some sort of test that concludes with an assertion.
+#+BEGIN_SRC C
+  UNIT_TEST_ASSERT(a + b == 3);
+#+END_SRC
+
+Finally, the method should close with
+#+BEGIN_SRC C
+  UNIT_TEST_END();
+}
+#+END_SRC
+
+* Executing the unit test
+
+As with any Contiki program, you need to set up a process that actually runs the unit test.
+#+BEGIN_SRC C
+PROCESS(test_process, "Unit testing");
+AUTOSTART_PROCESSES(&test_process);
+
+PROCESS_THREAD(test_process, ev, data)
+{
+  PROCESS_BEGIN();
+
+  UNIT_TEST_RUN(arithmetic);
+
+  PROCESS_END();
+}
+#+END_SRC
+
+* Running the unit test
+
+Although unit tests can be run on a mote, it's easiest to run them
+- natively (e.g., for testing a calculation or data-structure) or
+- under simulation (e.g., for networking)
+unless the test needs specific hardware that only the mote has.
+
+* Worked example
+#+BEGIN_SRC sh
+cd contiki-ng
+mkdir examples/unit-test
+cp examples/hello-world/Makefile examples/unit-test
+cp os/services/unit-test/example-test.c examples/unit-test
+#+END_SRC
+
+Then edit the Makefile to look more like this:
+#+BEGIN_SRC
+CONTIKI_PROJECT = example-test
+all: $(CONTIKI_PROJECT)
+MODULES += $(CONTIKI_NG_SERVICES_DIR)/unit-test
+
+CONTIKI = ../..
+include $(CONTIKI)/Makefile.include
+#+END_SRC
+
+Add an autostart process declaration to example-test.c
+#+BEGIN_SRC C
+PROCESS(test_process, "Unit testing");
+AUTOSTART_PROCESSES(&test_process);  /* <- */
+#+END_SRC
+
+The result will look something like this:
+#+BEGIN_SRC
+[WARN: Tun6      ] Failed to open tun device (you may be lacking permission). Running without network.
+[INFO: Main      ] Starting Contiki-NG-release/v4.6-54-g425587de4-dirty
+[INFO: Main      ] - Routing: RPL Lite
+[INFO: Main      ] - Net: tun6
+[INFO: Main      ] - MAC: nullmac
+[INFO: Main      ] - 802.15.4 PANID: 0xabcd
+[INFO: Main      ] - 802.15.4 Default channel: 26
+[INFO: Main      ] Node ID: 1800
+[INFO: Main      ] Link-layer address: 0102.0304.0506.0708
+[INFO: Main      ] Tentative link-local IPv6 address: fe80::302:304:506:708
+[INFO: Native    ] Added global IPv6 address fd00::302:304:506:708
+
+Unit test: Arith ops
+Result: success
+Exit point: example-test.c:58
+Start: 1927799
+End: 1927799
+Duration: 0
+Ticks per second: 1000
+
+Unit test: String ops
+Result: failure
+Exit point: example-test.c:69
+Start: 1927799
+End: 1927799
+Duration: 0
+Ticks per second: 1000
+#+END_SRC
+
+* Unit test theory
+
+The unit testing approach may be one of the most important ideas in Computer Science. However, there's more to it than simply having a unit test.
+
+A Unit Test should:
+- be written [[https://en.wikipedia.org/wiki/Test-driven_development][/prior/]] to writing the actual code
+- produce no output when it succeeds
+  - You shouldn't have to wade through reams of output to work out if your test worked
+- be simple and understandable
+- achieve 100% /code coverage/
+  - All statements in target unit get executed at least once during testing
+
+[[file:figures/TestingManifesto.jpg]]
+
+* Unit testing more complex code
+
+When unit testing code that interacts with a device or user, it is often necessary to write a testing /stub/ or /mock/ object that mimicks the device or user.
+
+- e.g., for our button press example, we can code a mock =get_button= method that checks the time and presses the button after 20 seconds and then after 60 seconds
+- notice how it is natural to code this mock method as a state machine
+#+BEGIN_SRC C
+int get_button() {
+  static int state = 0;
+  static clock_time_t first_call_time;
+
+  t = clock_time();
+  if (state == 0) {
+    state = 1;
+    first_call_time = t;
+    return 0;
+  }
+  else
+    t -= first_call_time;
+
+  if (state == 1 && t > 20 * CLOCK_SECOND) {
+    state = 2;
+    return 1;
+  }
+  else if (state == 2 && t > 40 * CLOCK_SECOND) {
+    state = 3;
+    return 1;
+  }
+  else
+    return 0;
+}
+#+END_SRC
+
+* Compile time problems
+
+1. First understand if the problem is during compilation (likely to be syntax) or linking (likely to be missing library or misspelled API call)
+2. Consider asking your search engine
+3. Check for hidden or special characters
+  #+BEGIN_SRC sh
+  cat -v myprog.c | diff - myprog.c
+  #+END_SRC
+4. Make sure your indentation is correct
+   1. Emacs will ordinarily keep your code indented properly
+      1. If needed, use <TAB> at the start of a line to check indent
+      2. You can also mark a region and use the =M-x indent-region= command
+   2. In sublime text, use the ~reindent~ option in the edit menu
+
+* Run time problems
+
+If your program compiles but still does not work as desired, consider:
+
+1. do you have unit tests?
+2. is the code in your editor actually the code that is being executed?
+   - e.g., you may not have saved before compiling or you may be editing on a different machine
+3. start with the test that maximises information returned
+4. question your assumptions
+   - use printf statements to check them
+   - e.g., does a particular function actually get called?
+5. as a last resort, use a debugging tool such as [[https://www.gnu.org/software/gdb/][GNU gdb]]
+* Summary
+
+- Debugging can be the most challenging part of programming
+- Unit testing is an important preventative approach
+- Avoid single stepping through your code unless you really have to

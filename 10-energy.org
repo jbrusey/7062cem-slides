@@ -1,0 +1,169 @@
+#+title: 7062CEM Energy benchmarking
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:1200, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 1
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem energy benchmarking">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+* Learning outcomes
+
+- Understand how to *measure* mote energy consumption
+
+- Be able to identifier energy consumers within a mote
+
+- Understand the *start-up*, *nominal*, and *long-term* aspects of energy consumption
+
+* Motivation
+
+- Deployment of wireless motes in a real environment often requires them to be /long-lived/ without intervention or need for battery change
+
+- To estimate lifetime, we need to measure power consumption (although battery choice may also be a factor)
+
+* Measurement
+
+** Basic theory
+
+ Instantaneous power $P$ is a function of voltage $V$ and current $I$
+ \[ P = VI \]
+
+ Power varies over time and so the energy consumption is the integral of power
+ \[ E = \int_{0}^t P(t)\ \mathrm{d}t \]
+
+ However we often only have a series of measurements and thus need to estimate based on a series of measurements
+ \[ E \approx \Delta t \sum_0^t P(t) \]
+
+ where $\Delta t$ is the fixed time period between power measurements.
+** Why is measurement difficult for motes?
+
+Wireless sensor devices have a mix of high current usage:
+- sensing (particularly for some sensors)
+- radio listening or transmission
+
+and low or medium current usage:
+- sleep
+- computation
+
+Furthermore, power consumption varies rapidly over time.
+
+It's often difficult to accurately characterise both types of usage with the one measurement device
+
+Sleep current is particularly difficult since it is both instantaneously small but a big overall contributor
+
+** Using an oscilloscope
+
+Oscilloscopes are good for accurately identifying time periods:
+
+- how long does sensing take?
+
+It is also possible to estimate the current draw by measuring the voltage drop for an in-series resistor
+
+Expect, however, a +/- 10% error on this measurement
+
+No good for measuring micro amps (e.g., sleep current)
+
+** Using a multimeter
+
+Precision multimeters are much better for measuring microamp currents
+
+However they tend to assume that current use is roughly constant
+
+Accuracy thus can be improved by
+1. micro-benchmarking
+2. using an R-C circuit to smooth input to the multimeter
+
+
+** Using a power analyzer
+
+A power analyzer, such as the Qoitech OTII, simplifies the task of assessing power consumption and will simultaneously measure voltage and current.
+
+Power analyzers are more accurate than oscilloscopes for sleep current but a precision multimeter is the gold standard
+
+#+attr_latex: :placement [H] :width 0.5\textwidth
+[[file:figures/qoitech-otii-arc-power-analyzer-dc-power-supply-data-logger.jpg]]
+** Power analyzer output
+#+attr_latex: :placement [H] :width 0.5\textwidth
+file:figures/otii-analyze.jpg
+** Microbenchmarking
+Consider this power consumption graph:
+#+attr_latex: :placement [H] :width 0.5\textwidth
+[[file:figures/fig8-max-no-spikes.png]]
+
+We can identify 5 distinct time periods:
+- CJC warm-up (this is for a thermocouple sensor)
+- CPU active
+- transmission
+- polling
+- idle
+
+** Microbenchmarking targeted measurement
+
+Microbenchmarking addresses the problem of characterising the power consumption of individual operational modes.
+
+For each operational mode (e.g., transmitting a radio packet):
+1. Program the mote to repeatedly (X times) transmit a packet
+2. Measure current (e.g., with a precision multimeter)
+3. Measure time period (e.g., with an oscilloscope) and divide by X
+
+** Microbenchmarking summary
+
+We then form a table like this
+
+| Operation    | Current (mA) | Time (s) | mAs |
+|--------------+--------------+----------+-----|
+| Sensing      |              |          |     |
+| CPU active   |              |          |     |
+| Radio send   |              |          |     |
+| Radio listen |              |          |     |
+| Idle         |              |          |     |
+|--------------+--------------+----------+-----|
+| Total        |              |          | --- |
+|              |              |          |     |
+
+Note that to convert to power, we need to assume the voltage is constant (e.g., 3V)
+
+Here's a worked example from Klues et al.
+#+attr_latex: :placement [H] :width 0.5\textwidth
+[[file:figures/klues-table.png]]
+
+[[https://ieeexplore.ieee.org/abstract/document/7471452]]
+
+[[https://dl.acm.org/doi/pdf/10.1145/1294261.1294286?casa_token=TUXZOamkmJ8AAAAA:HAnvY8uNRzjntTuNuO34Lf9awk0dFLg3AQXWSSaHzAhsuavgZp7_xAFQK3FKbtOaXSYSFIz9qS6XS5I]]
+
+
+* Consider the larger picture
+
+Not all behaviour will be in the short term. Consider the following graph of battery voltage state over time:
+#+attr_latex: :placement [H] :width 0.5\textwidth
+[[file:figures/fig12-owls-battery.png]]
+The sudden downward dips in battery voltage reflect periods when the server was unavailable. During this period, wireless nodes were retrying each transmission repeatedly and thus using more energy.
+
+** Also consider start-up energy costs
+
+- Start-up energy consumption may be radically different and this will be an issue if you are using energy harvesting
+#+attr_latex: :placement [H] :width 0.5\textwidth
+[[file:figures/system-components.png]]
+
+* Contiki built-in tools
+
+[[https://github.com/contiki-ng/contiki-ng/wiki/Documentation:-Energest][Energest]] provides a simple way to estimate the energy use based on when the radio is being used
+
+Typical output looks like:
+#+BEGIN_SRC
+Energest:
+ CPU             0s LPM         9s DEEP LPM    0s  Total time 10s
+ Radio LISTEN   10s TRANSMIT    0s OFF         0s
+
+Energest:
+ CPU             0s LPM        19s DEEP LPM    0s  Total time 20s
+ Radio LISTEN   20s TRANSMIT    0s OFF         0s
+#+END_SRC
+
+
+* Summary
+
+- Microbenchmarking is a key idea for accurately measuring energy low-power motes
+
+- Don't just think about normal operation but also watch for exceptional behaviour occurring in the long term and during start-up

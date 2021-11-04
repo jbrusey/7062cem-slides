@@ -1,0 +1,177 @@
+#+title: 7062CEM Lab Session 1
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: toc:nil
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+* Prerequisites
+- You must have access to a mote (you should have been allocated one)
+* Learning outcomes                                                   
+- Confirm understanding of the compilation process
+- Be able to modify code, recompile it, load it to the mote, and check that it works
+
+* Connect to your mote
+You will need to modify =Vagrantfile= to be able to connect to the mote.
+#+BEGIN_SRC ruby
+  config.vm.provider "virtualbox" do |vb|
+    vb.customize ["modifyvm", :id, "--usb", "on",
+                  "--usbxhci", "on",
+                  "--paravirtprovider", "kvm"]
+    vb.customize ["usbfilter", "add", "0", 
+                  "--target", :id, 
+    	          "--name", "MTM-CM5000MSP",
+	          "--vendorid", "0x0403",
+	          "--productid", "0x6001"]
+  #   # Display the VirtualBox GUI when booting the machine
+  #   vb.gui = true
+  #
+  #   # Customize the amount of memory on the VM:
+  #   vb.memory = "1024"
+  end
+#+END_SRC
+
+Note the =vb.gui= line. You can uncomment to get a graphical user interface, which may be needed for Cooja.
+
+Also note that if you need to increase the available virtual memory, you can do this by uncommenting the =vb.memory= line and changing the value (it's in kilobytes). I often use 4096.
+
+To see if your device is connecting, from the =vagrant ssh= session, do this:
+#+BEGIN_SRC sh
+$ make TARGET=sky motelist
+Port          Serial    VID     PID     Product        Vendor
+------------  --------  ------  ------  -------------  ------
+/dev/ttyUSB0  FTWGUH2B  0x0403  0x6001  MTM-CM5000MSP  FTDI  
+#+END_SRC
+* Blink the LED
+
+Start by finding and creating a Makefile for =blink.c=
+#+BEGIN_SRC sh
+$ cd contiki-ng
+$ find . -name "blink.c"
+#+END_SRC
+
+Your output should look like this:
+#+BEGIN_SRC sh
+./arch/platform/sky/apps/blink.c
+#+END_SRC
+
+This tells you the directory to change into:
+#+BEGIN_SRC sh
+$ cd arch/platform/sky/apps
+#+END_SRC
+
+You will then need a Makefile that looks something like this:
+#+BEGIN_SRC makefile
+CONTIKI_PROJECT = blink
+all: $(CONTIKI_PROJECT)
+
+CONTIKI = ../../../..
+# note: check that above points to correct directory
+include $(CONTIKI)/Makefile.include
+#+END_SRC
+Make sure that you have the correct number of =..= to match how deep you are in the directory tree. In this case, you need to go up 4 directory levels since you are 4 deep in the contiki-ng directory structure.
+
+** Edit the code
+
+The default code references =LEDS_ALL= as the LED to turn on but this doesn't seem to work with the Telos. Try other options here. For example, try =LEDS_RED=.
+
+The definitions of the leds can be found in =os/dev/leds.h=
+
+** Compile and download the code
+
+From the command line (you will need to adjust the USB port)
+#+BEGIN_SRC sh
+$ make TARGET=sky savetarget
+$ make blink
+$ make MOTES=/dev/ttyUSB0 blink.upload
+#+END_SRC
+Check the output carefully to ensure that the upload succeeded.
+
+# ** Check the camera
+
+# Login to the camera at http://cogentee.hopto.org:88 using the supplied password.
+
+# Does it blink?
+
+# Note that if other students are also working at the same time then it may be hard to tell which mote is yours. One way to tell is to watch for the busy green and red LEDs during programming.
+
+** Things to try
+
+Can you change the colour?
+
+Can you make two LEDs come on at once?
+
+* Use two processes to blink two LEDs at different rates
+
+We are now going to try to add an additional process to blink a different LED at a rate of once every 2 seconds.
+
+Use the following procedure:
+1. Create a copy of your code
+   #+BEGIN_SRC sh
+$ cp blink.c blinktwice.c
+   #+END_SRC
+2. Edit the first line of your =Makefile= to include =blinktwice=
+3. Edit =blinktwice.c= and make the following changes:
+   1. Add a new PROCESS statement
+      #+BEGIN_SRC C
+PROCESS(another_process, "My other process");
+      #+END_SRC
+   2. Add this new process to the /existing/ AUTOSTART statement (note that you need use =&= to give it the /address/ of the process)
+      #+BEGIN_SRC C
+AUTOSTART_PROCESSES(&blink_process, &another_process);
+      #+END_SRC
+   3. Make an entire copy of the process function and call it =another_process=
+      #+BEGIN_SRC C
+PROCESS_THREAD(blink_ ...
+  ...
+}
+      #+END_SRC
+   4. Adjust the =etimer_set= statements to use =2*CLOCK_SECOND= in =another_process= only.
+   5. Change the color of the LED being turned on and off
+4. Recompile and test on the mote
+
+Did it work? If not, carefully review what you've done and check that you have properly downloaded your new code to the mote.
+
+* Convert the temperature reading
+
+If you've made it here, that's great!
+
+For this stage, we are going to read the temperature and check that we can convert it to an actual reading.
+
+Drivers for the Telos mote can be found in the sky platform directory =arch/platform/sky/dev=.
+
+Use the following code:
+#+BEGIN_SRC C
+#include "stdio.h"
+#include "contiki.h"
+#include "dev/sensor/sht11/sht11.h"
+#include "dev/sensor/sht11/sht11-sensor.h"
+
+PROCESS(temp, "Temperature");
+
+AUTOSTART_PROCESSES(&temp);
+
+PROCESS_THREAD(temp, ev, data)
+{
+  static struct etimer timer;
+  PROCESS_BEGIN();
+
+  /* Setup a periodic timer that expires after 10 seconds. */
+  etimer_set(&timer, CLOCK_SECOND * 10);
+  SENSORS_ACTIVATE(sht11_sensor);
+  while (1) {
+    PROCESS_WAIT_EVENT_UNTIL(etimer_expired(&timer));
+    int temp = sht11_sensor.value(SHT11_SENSOR_TEMP);
+    printf("temp: %d\n", temp);
+    etimer_reset(&timer);
+  }
+
+  PROCESS_END();
+}
+#+END_SRC
+
+** Exercise
+
+Perform these steps:
+1. Compile and test the above program. Note that you will need to adjust your Makefile to add the new program as a possible target. Optionally, put the new program into a directory of its own.
+2. You should note that the temperature readings are not in degrees Celsius. Check the lecture notes for the sensing lecture to get the conversion formula.
+3. Adjust your code to use the conversion formula to output the converted temperature. Note that you should split your value into an integer and fractional part when using =printf= rather than trying to using ="%f"= in your format string.
