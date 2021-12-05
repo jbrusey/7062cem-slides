@@ -133,6 +133,51 @@ static char process_thread_hello_world_process(struct pt *process_pt, process_ev
   - Think about what =process_pt= struct you are passing in
 - Instead use =PROCESS_POST= to queue an event that is then received by the other process
 
+* Understanding PAUSE versus YIELD
+- As discussed [[https://github.com/contiki-ng/contiki-ng/wiki/Documentation:-Processes-and-events#pausing-and-yielding][in the wiki]], =PROCESS_PAUSE= is not the same as =PROCESS_YIELD=
+- PAUSE expects to be called again as soon as possible
+- YIELD says - wait for the next event (and the processor can sleep)
+- This is why we typically want to use event timers and event waits, so that the processor can sleep while waiting
+- A nice exercise to try here is to compare an ordinary =timer= with an =etimer=
+  - What sort of wait do we need for =timer=?
+  - Do both operate in the same way?
+  - Which one allows the processor to sleep?
+** Using event timer
+The normal approach to sleeping (or delaying) for some duration is to use an event timer. 
+#+BEGIN_SRC c
+  static struct etimer timer;
+  PROCESS_BEGIN ();
+  /* Setup a periodic timer that expires after 10 seconds. */
+  etimer_set (&timer, 10 * CLOCK_SECOND);
+  while (1)
+    {
+      printf ("etimer reading is %lu\n", clock_time());
+      /* Wait for the periodic timer to expire and then restart the timer. */
+      PROCESS_WAIT_EVENT_UNTIL (etimer_expired (&timer));
+      etimer_reset (&timer);
+    }
+  PROCESS_END ();
+#+END_SRC
+** Using a normal timer
+It is possible to use a normal timer but notice that we need to use PAUSE to ensure that the process is still considered active. This will have the negative side effect of not allowing the processor to sleep.
+#+BEGIN_SRC c
+  static struct timer timer;
+  PROCESS_BEGIN ();
+  /* Setup a periodic timer that expires after 10 seconds. */
+  timer_set (&timer, 10 * CLOCK_SECOND);
+  while (1)
+    {
+      printf ("timer reading is %lu\n", clock_time());
+      /* Wait for the periodic timer to expire and then restart the
+	 timer. */
+      do {
+	PROCESS_PAUSE();
+      } while (!timer_expired(&timer));
+      timer_reset (&timer);
+    }
+  PROCESS_END ();
+#+END_SRC
+
 * Things to watch for
 - =process_pt= is a structure with =lc= being the line counter
 
@@ -153,3 +198,7 @@ static char process_thread_hello_world_process(struct pt *process_pt, process_ev
 - We've uncovered the heart of Contiki, which is concurrency through protothreads
 
 - Understanding PTs will help when trying to understand compiler errors
+* Additional reading
+
+https://github.com/contiki-ng/contiki-ng/wiki/Documentation:-Multitasking-and-scheduling
+
