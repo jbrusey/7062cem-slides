@@ -119,15 +119,7 @@ Note: in Contiki, the macros start =PROCESS=, not =PT=
 
 #+BEGIN_SRC sh
 $ cd contiki/examples/hello-world
-$ make -n TARGET=native hello-world
-#+END_SRC
-- extract from this the CC command to compile hello-world.c and change “-c” to “-E” (stop after running pre-processor)
-#+BEGIN_SRC sh
-cc ... -c hello-world.c -o hello-world.o
-#+END_SRC
-to
-#+BEGIN_SRC sh
-cc ... -E hello-world.c -o hello-world.i
+$ make TARGET=native hello-world.e
 #+END_SRC
 * Examine the result
 - can you see what each macro got substituted for?
