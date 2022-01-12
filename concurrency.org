@@ -1,0 +1,197 @@
+#+title: 7062CEM Concurrency
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: num:nil toc:nil
+#+REVEAL_INIT_OPTIONS: width:1200, height:1200, margin: 0.1, minScale:0.2, maxScale:2.5, transition:'cube', slideNumber:true
+#+REVEAL_THEME: white
+#+REVEAL_HLEVEL: 1
+#+REVEAL_HEAD_PREAMBLE: <meta name="description" content="7062cem sensors and sensing">
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+* Learning outcomes                                                   
+- understand concurrency
+- understand Contiki support for concurrency
+  
+
+* What is concurrency?
+With a uniprocessor (single CPU), concurrency occurs when either:
+the operating system pre-empts one task to run another
+an hardware interrupt occurs (and runs an interrupt driver)
+For multiprocessors (most modern CPUs are), concurrency occurs with or without the above two things.
+In essence concurrency means two (or more) things happening at the same time
+
+
+concurrency with TinyOS?
+yes - there are still hardware interrupts (e.g. the radio, low-level timers, etc)
+also - multiple independent motes are concurrent
+
+example: housemates and beer*
+Thread 1 (person 1):
+look in fridge
+if no beer, 
+go and buy beer
+put beer in fridge
+*Watson (2013) http://www.cl.cam.ac.uk/teaching/1415/ConcDisSys/2013a-ConcurrentSystems-1B-L1.pdf 
+Thread 2 (person 2):
+look in fridge
+if no beer, 
+go and buy beer
+put beer in fridge
+as with most concurrent systems, it works fine most of the time
+BUT if either person looks while the other is at the shop buying beer … we end up with too much beer
+
+beer problem: solution 1 (leave note)
+Thread 1 (person 1):
+look in fridge
+if no beer, & no note
+write a note
+go and buy beer
+put beer in fridge
+remove note
+Thread 2 (person 2):
+look in fridge
+if no beer, & no note
+write a note
+go and buy beer
+put beer in fridge
+remove note
+works for humans (mostly)
+will it work for computers?
+what is the potential problem?
+
+as code ...
+# Thread 1
+(beer, note) = check_fridge()
+if not beer:
+  if not note:
+    set_note(True)
+    buy_beer()
+    set_note(False)
+# Thread 2
+(beer, note) = check_fridge()
+if not beer:
+  if not note:
+    set_note(True)
+    buy_beer()
+    set_note(False)
+how could these be interleaved (scheduled) so as to cause a problem?
+
+possible problem schedule
+# Thread 1
+(beer, note) = check_fridge()
+if not beer:
+  if not note:
+
+
+
+
+
+    set_note(True)
+    buy_beer()
+    set_note(False)
+# Thread 2
+
+
+(beer, note) = check_fridge()
+if not beer:
+  if not note:
+    set_note(True)
+    buy_beer()
+    set_note(False)
+This type of problem is called a race condition
+
+is this a problem? (yes)
+getting a particular interleaving that causes a problem may be quite hard - making it unlikely that the problem shows up
+however, “mostly correct” code is worse than “mostly wrong”
+easier to identify and debug programs that fail all the time
+no easy way to bring on the problem for rare failures
+problem may even disappear when including debugging code or printfs
+
+
+possible problem schedule
+# Thread 1
+(beer, note) = check_fridge()
+if not beer:
+  if not note:
+
+
+
+
+
+    set_note(True)
+    buy_beer()
+    set_note(False)
+# Thread 2
+
+
+(beer, note) = check_fridge()
+if not beer:
+  if not note:
+    set_note(True)
+    buy_beer()
+    set_note(False)
+the problem is that we read the “state” here
+but don’t update it until here
+
+critical section
+the section where we read “note” and then update it should not be interrupted - this is referred to as a critical section
+
+In TinyOS, a statement or block can be made uninterruptable by using the atomic keyword. e.g. 
+atomic {
+  t = note;
+  if (!t) note = TRUE;
+}
+if (!t) { buyBeer();...
+but there is still a problem! do we still need beer?
+
+beer solution 2
+# Thread 1
+atomic { 
+(beer, note) = check_fridge()
+if not beer:
+  if not note:
+    set_note(True)
+    buy_beer()
+    set_note(False)
+}
+# Thread 2
+atomic {
+(beer, note) = check_fridge()
+if not beer:
+  if not note:
+    set_note(True)
+    buy_beer()
+    set_note(False)
+}
+this has some problems though: 
+brute force (stops everything else from running)
+may block timer or other interrupts
+
+tinyos solution
+this will be left as an exercise but key ideas are:
+use a boolean value to “lock” a set of variables or data structure
+always use atomic when reading or writing the lock
+never read or write to protected data structure unless holding the lock
+if you can’t currently get the lock, retry later by “posting” a task
+note: this means that you must be in a task to do the job.
+
+tinyos tools - async
+Ordinary tinyos code is synchronous and thus executed to completion before any other synchronous code is run
+
+Interrupt drivers may be asynchronous in that they may be called before synchronous code has completed
+
+This is marked by “async” keyword on function definition
+
+
+
+exercise
+examine some async methods and identify why they are needing to be asynchronous
+
+what we’ve covered today
+What is concurrency?
+Housemates buying beer example
+TinyOS tools for concurrency - atomic and async
+
+additional reading
+TinyOS programming (book) - chapter 11
+Any good OS textbook about concurrency

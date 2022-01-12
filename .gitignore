@@ -1,0 +1,5 @@
+/ltximg/
+/figures/*.aux
+/figures/*.fdb_latexmk
+/figures/*.fls
+/figures/*.log

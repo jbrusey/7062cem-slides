@@ -1,0 +1,30 @@
+#+title: Tips for the coursework
+#+Author: James Brusey
+#+Email: j.brusey@coventry.ac.uk
+#+Options: toc:nil
+#+latex_header: \usepackage[osf]{mathpazo}
+#+latex_header: \usepackage{booktabs}
+
+* Writing robust C code
+- Avoid the use of global variables, particularly as shared areas between two processes
+- Choose meaningful variable and function names.
+- Remove code that is not relevant.
+- Never ignore warnings from the compiler.
+- Do not repeat yourself - you shouldn't have duplicates of the same section of code in several parts of your code listing.
+  Similarly, do not make several copies of the code for different parts of the demo (i.e., don't have one for when testing on the network and a separate source code for testing the sensor).
+- Make cohesive and coherent functions - the contents of a function (or process thread) should sit naturally with one another.
+  E.g., avoid having a function that both performs some computation and sends a message---such functions should be split into two separate parts.
+- Every function that *can* be tested *should* be tested.
+  E.g., when calculating the humidity from the sensor reading, a separate function is needed to perform the calculation and then this should be tested to see that it does its job correctly.
+
+  
+* Video production
+- It's recommended to use screen capture when showing things on the screen
+- Do not show your source code - consider what you would show a boss rather than an academic
+- Do not show the compilation unless there is a strong reason (e.g., an error message that you couldn't resolve)
+- Make sure you answer these questions:
+  1. Do the test cases pass?
+  2. Can the mote print out meaningful values including floating point numbers?
+  3. Do those values change when we do something to the sensor?
+  4. Does the networking mechanism support multi-hop?
+  

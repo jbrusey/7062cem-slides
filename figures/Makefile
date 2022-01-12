@@ -1,5 +1,7 @@
-fsm.png: fsm.pdf
+all: fsm.png fsm2.png
+
+%.png: %.pdf
 	convert -density 300 -resize 50% $^ $@
 
-fsm.pdf: fsm.tex
+%.pdf: %.tex
 	latexmk -pdf $^

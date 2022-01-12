@@ -57,6 +57,24 @@
 #+ATTR_LATEX: :width 0.3\textwidth
 [[file:figures/fsm.png]]
 
+Alternatively to labelling the circles (states) with whether the light is on or off, we can label the arcs (transitions) with the action of turning on or off the light.
+
+#+ATTR_LATEX: :width 0.3\textwidth
+[[file:figures/fsm2.png]]
+
+* Representing a state machine as a table
+
+The previous state machine can also be represented as a table with columns for
+1. what /state/ we are in
+2. what additional /condition/ causes a transition
+3. what /new state/ to transition to
+4. /actions/ to take when transitioning
+
+| state | condition | new state | actions          |
+|-------+-----------+-----------+------------------|
+| $q_1$ | push      | $q_2$     | =turn_on_light=  |
+| $q_2$ | push      | $q_1$     | =turn_off_light= |
+|       |           |           |                  |
 
 
 * Converting to code 
